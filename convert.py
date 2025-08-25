@@ -185,13 +185,13 @@ def _make_gpx_header(use_osmand_extensions: bool) -> str:
     header = '<?xml version="1.0" encoding="UTF-8"?>\n'
     if use_osmand_extensions:
         header += (
-            '<gpx version="1.1" creator="Python Converter" '
+            '<gpx version="1.1" creator="https://github.com/gekich/vpohid-gpx-converter" '
             'xmlns="http://www.topografix.com/GPX/1/1" '
             'xmlns:osmand="https://osmand.net">'
         )
     else:
         header += (
-            '<gpx version="1.1" creator="Python Converter" '
+            '<gpx version="1.1" creator="https://github.com/gekich/vpohid-gpx-converter" '
             'xmlns="http://www.topografix.com/GPX/1/1">'
         )
     return header

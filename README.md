@@ -1,4 +1,6 @@
-# GPX Converter for vpohid.com.ua
+# vpohid-gpx-converter
+
+![Main screenshot](assets/screenshots/Screenshot_1.png)
 
 Конвертер точок з JSON у GPX 1.1 з опціональними розширеннями OsmAnd (іконки та кольори).
 
@@ -105,3 +107,8 @@ python convert.py --base-url "https://vpohid.com.ua"
 ## Розробка
 - Дивіться `convert.py` — основна логіка конвертації.
 - Pull requests та issues вітаються.
+
+## Посилання
+- Репозиторій: https://github.com/gekich/vpohid-gpx-converter
+- Issues: https://github.com/gekich/vpohid-gpx-converter/issues
+- Pull Requests: https://github.com/gekich/vpohid-gpx-converter/pulls
