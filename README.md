@@ -6,27 +6,28 @@
 
 ## Можливості
 - Конвертація з JSON або напряму з сайту (URL: https://vpohid.com.ua/json/map/v/items/...).
-- Результат: GPX-файл (з тегами OsmAnd або стандартний).
+- Результат: GPX-файл (з тегами OsmAnd або стандартний). Зберігає
+  - широта/довгота, висота над рівнем моря
+  - назва/опис/посилання на сайт
+  - дата додавання → GPX <time>
+  - тип/категорія
+  - іконка+колір (для OsmAnd)
 - Групування точок: в одну групу або за типом (`kind`).
 
+## Вимоги
+- Python 3.7
+
+## Параметри
+- -u, --url: URL з об'єктами (очікується response.items). https://vpohid.com.ua/json/map/v/items/...
+- -i, --input: Вхідний JSON-файл. Якщо не вказано і не задано URL, використовується my_places.json.
+- -o, --output: Шлях до вихідного GPX-файлу. За замовчуванням converted_places_osmand.gpx або converted_places_standard.gpx.
+- --no-osmand-tags: Вимкнути теги OsmAnd.
+- --group-name: Назва єдиної групи точок; якщо не вказано — групування відбувається за типом (kind).
+
 ## Приклади
-- Імпорт напряму:
-    - `python convert.py -u "https://vpohid.com.ua/json/map/v/items/..."`
-- Імпорт з json:
-  - `python convert.py -i path/to/my_places.json`
-- Без тегів OsmAnd:
-  - `python convert.py --no-osmand-extensions`
-- Групувати точки за типом (`kind`) замість однієї групи:
-  - `python convert.py --by-kind`
-- Задати власну назву єдиної групи:
-  - `python convert.py --single-group --group-name "Мої точки"`
+Мінімальний запуск з URL:
 
-> Усі опції: `python convert.py -h`
-
-## Налаштування через .env (опціонально)
-`mv .env.example .env`
-
-> CLI-параметри мають пріоритет над .env
+`python convert.py -u "https://vpohid.com.ua/json/map/v/items/..."`
 
 ## Імпортувати в OsmAnd
 - OsmAnd → Мої місця → Імпортувати закладки.
