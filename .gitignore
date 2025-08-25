@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+.env
+.env.*
+
+# OS files
+.DS_Store
+
+# Test/Cache
+.pytest_cache/
+.cache/
+
+# Editor
+.idea/
+.vscode/
+
+# Data files (do not commit real data by default)
+*.json
+*.gpx
+# But allow committing example/sample JSONs by force-adding if needed
+# e.g. use: git add -f example.json
