@@ -4,12 +4,12 @@
 
 Конвертер об'єктів з https://vpohid.com.ua у GPX або OsmAnd.
 
-## Що вміє
+## Можливості
 - Конвертація з JSON або напряму з сайту (URL: https://vpohid.com.ua/json/map/v/items/...).
 - Результат: GPX-файл (з тегами OsmAnd або стандартний).
 - Групування точок: в одну групу або за типом (`kind`).
 
-## Приклади використання
+## Приклади
 - Імпорт напряму:
     - `python convert.py -u "https://vpohid.com.ua/json/map/v/items/..."`
 - Імпорт з json:
@@ -21,14 +21,14 @@
 - Задати власну назву єдиної групи:
   - `python convert.py --single-group --group-name "Мої точки"`
 
-> `python convert.py -h`, щоб побачити всі опції.
+> Усі опції: `python convert.py -h`
 
 ## Налаштування через .env (опціонально)
 `mv .env.example .env`
 
 > CLI-параметри мають пріоритет над .env
 
-## Імпортуват в OsmAnd
+## Імпортувати в OsmAnd
 - OsmAnd → Мої місця → Імпортувати закладки.
 - Оберіть створений GPX-файл.
 
