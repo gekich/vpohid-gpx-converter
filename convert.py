@@ -1,3 +1,25 @@
+"""
+GPX converter for vpohid.com.ua JSON exports.
+
+Features:
+- Reads data either from a local JSON file or from a URL.
+- Supports three input JSON shapes: a plain list of items, an object with "items",
+  or an object with "response.items".
+- Produces GPX 1.1; optionally adds OsmAnd extensions (icon, color, background).
+- Supports grouping: single group name or by item kind.
+
+Configuration sources (priority: CLI > ENV > built-in defaults):
+ENV variables:
+- USE_OSMAND_EXTENSIONS: 1/true/yes/on to enable OsmAnd extensions (default: True)
+- USE_SINGLE_GROUP_NAME: 1/true/yes/on to put all points into one group (default: True)
+- GROUP_NAME: name of the single group (default: "Імпорт з vpohid.com.ua")
+- INPUT_JSON_FILE: path to input JSON file
+- INPUT_URL: URL to load JSON from
+- OUTPUT_GPX_FILE: output GPX file path (auto-generated if empty)
+- BASE_URL: base URL for building full links from viewurl (default: https://vpohid.com.ua)
+
+CLI flags mirror the above and override ENV.
+"""
 import argparse
 import html
 import json
@@ -12,8 +34,11 @@ try:
 
     load_dotenv()
 except Exception:
-    # fallback скрипт
+    # Lightweight .env loader if python-dotenv is not available
     def _load_dotenv_fallback(path: str = ".env") -> None:
+        """Minimal .env loader: adds KEY=VALUE pairs to os.environ if not set.
+        Ignores comments, blank lines, and does not overwrite existing variables.
+        """
         try:
             if not os.path.exists(path):
                 return
@@ -27,7 +52,7 @@ except Exception:
                     key, val = line.split("=", 1)
                     key = key.strip()
                     val = val.strip().strip('"').strip("'")
-                    # Не перезаписуємо вже встановлені змінні середовища
+                    # Do not overwrite already-set environment variables
                     if key and key not in os.environ:
                         os.environ[key] = val
         except Exception:
@@ -36,8 +61,8 @@ except Exception:
 
     _load_dotenv_fallback()
 
-# --- КОНСТАНТИ МАПІНГІВ ---
-# Співставлення типів ('kind') з іконками OsmAnd.
+# --- MAPPING CONSTANTS ---
+# Mapping of types ('kind') to OsmAnd icons.
 KIND_TO_OSMAND_ICON: Dict[str, str] = {
     "dangerplace": "hazard",
     "guide": "tourism_information",
@@ -52,10 +77,10 @@ KIND_TO_OSMAND_ICON: Dict[str, str] = {
     "usefulbuilding": "special_house",
     "watersource": "natural_spring",
 }
-# Іконка за замовчуванням, якщо тип не знайдено у словнику.
+# Default icon if the type is not found in the dictionary.
 DEFAULT_ICON = "special_star"
 
-# Співставлення типів ('kind') з кольорами іконок.
+# Mapping of types ('kind') to icon colors.
 KIND_TO_COLOR: Dict[str, str] = {
     "dangerplace": "#FF0000",
     "guide": "#0000FF",
@@ -70,15 +95,12 @@ KIND_TO_COLOR: Dict[str, str] = {
     "usefulbuilding": "#808080",
     "watersource": "#00FFFF",
 }
-# Колір за замовчуванням.
+# Default color.
 DEFAULT_COLOR = "#4A4A4A"
 
 
 def _bool_from_env(name: str, default: bool) -> bool:
-    """Перетворює значення змінної середовища у bool.
-
-    Приймає значення на кшталт: 1, true, yes, on (регістр і пробіли ігноруються).
-    """
+    """Parse boolean env var: accepts 1/true/yes/on (case-insensitive)."""
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -87,35 +109,34 @@ def _bool_from_env(name: str, default: bool) -> bool:
 
 
 def build_config_from_env_and_args() -> Dict[str, Any]:
-    """Збирає конфіг з ENV та аргументів CLI, з пріоритетом CLI.
+    """Build runtime config from ENV and CLI (CLI has priority).
 
-    Важливо: значення за замовчуванням для джерела даних (my_places.json) застосовується
-    лише якщо користувач не вказав жодного джерела (ані файл, ані URL).
-    Це гарантує, що INPUT_URL не буде переважено дефолтом файлу.
+    Returns a dict with keys: use_osmand_extensions, use_single_group_name,
+    group_name, input_json, input_url, output_gpx, base_url.
+    If neither input_json nor input_url is provided, defaults to my_places.json.
+    If output_gpx is empty, generates a name based on OsmAnd flag.
     """
-    # Значення за замовчуванням (як у старій версії для інших параметрів)
     defaults = {
         "use_osmand_extensions": True,
         "use_single_group_name": True,
         "group_name": "Імпорт з vpohid.com.ua",
-        # Джерела за замовчуванням порожні — визначимо fallback нижче, якщо обидва відсутні
         "input_json": "",
         "input_url": "",
         "base_url": "https://vpohid.com.ua",
     }
 
-    # Спочатку ENV
+    # First, read from ENV
     cfg = {
         "use_osmand_extensions": _bool_from_env("USE_OSMAND_EXTENSIONS", defaults["use_osmand_extensions"]),
         "use_single_group_name": _bool_from_env("USE_SINGLE_GROUP_NAME", defaults["use_single_group_name"]),
         "group_name": os.getenv("GROUP_NAME", defaults["group_name"]),
         "input_json": os.getenv("INPUT_JSON_FILE", defaults["input_json"]) or "",
         "input_url": os.getenv("INPUT_URL", defaults["input_url"]) or "",
-        "output_gpx": os.getenv("OUTPUT_GPX_FILE", ""),  # якщо порожньо — згенеруємо автоматично
+        "output_gpx": os.getenv("OUTPUT_GPX_FILE", ""),  # if empty — will be generated automatically
         "base_url": os.getenv("BASE_URL", defaults["base_url"]),
     }
 
-    # Потім CLI (має вищий пріоритет)
+    # Then CLI (has higher priority)
     parser = argparse.ArgumentParser(
         description=(
             "Конвертує список локацій з JSON у GPX 1.1. "
@@ -132,32 +153,32 @@ def build_config_from_env_and_args() -> Dict[str, Any]:
                               help="Увімкнути розширення OsmAnd")
     group_osmand.add_argument("--no-osmand-extensions", dest="use_osmand_extensions", action="store_false",
                               help="Вимкнути розширення OsmAnd")
-    parser.set_defaults(use_osmand_extensions=cfg["use_osmand_extensions"])  # значення за замовчуванням з ENV/дефолтів
+    parser.set_defaults(use_osmand_extensions=cfg["use_osmand_extensions"])
 
     group_grouping = parser.add_mutually_exclusive_group()
     group_grouping.add_argument("--single-group", dest="use_single_group_name", action="store_true",
                                 help="Усі точки в одну групу")
     group_grouping.add_argument("--by-kind", dest="use_single_group_name", action="store_false",
                                 help="Групувати за типом (kind)")
-    parser.set_defaults(use_single_group_name=cfg["use_single_group_name"])  # значення за замовчуванням з ENV/дефолтів
+    parser.set_defaults(use_single_group_name=cfg["use_single_group_name"])
 
     parser.add_argument("--group-name", dest="group_name", help="Назва групи, якщо використовується одна група")
     parser.add_argument("--base-url", dest="base_url", help="Базова URL-адреса для побудови повних посилань")
 
     args = parser.parse_args()
 
-    # Оновлюємо конфіг значеннями з аргументів, якщо вони задані
+    # Update config with argument values if provided
     for key in ["input_json", "input_url", "output_gpx", "group_name", "base_url", "use_osmand_extensions",
                 "use_single_group_name"]:
         val = getattr(args, key, None)
         if val is not None:
             cfg[key] = val
 
-    # Якщо користувач не вказав жодного джерела — застосовуємо дефолтний файл
+    # If no source provided — use default file
     if not cfg.get("input_json") and not cfg.get("input_url"):
         cfg["input_json"] = "my_places.json"
 
-    # Якщо вихідний файл не заданий — згенеруємо назву автоматично
+    # If output file is not set — generate the name automatically
     if not cfg["output_gpx"]:
         cfg["output_gpx"] = f"converted_places_{'osmand' if cfg['use_osmand_extensions'] else 'standard'}.gpx"
 
@@ -165,11 +186,11 @@ def build_config_from_env_and_args() -> Dict[str, Any]:
 
 
 def _extract_items(ob: Any) -> List[Dict[str, Any]]:
-    """Повертає список елементів з можливих форматів JSON.
-    - Якщо це масив — повертає його як список словників.
-    - Якщо це об'єкт з response.items — повертає цей список.
-    - Якщо це об'єкт з items — повертає цей список.
-    Інакше ValueError.
+    """Return a list of items from possible JSON shapes.
+    - If it's an array — return it as a list of dicts.
+    - If it's an object with response.items — return that list.
+    - If it's an object with items — return that list.
+    Otherwise, raise ValueError.
     """
     if isinstance(ob, list):
         return ob  # type: ignore[return-value]
@@ -182,6 +203,7 @@ def _extract_items(ob: Any) -> List[Dict[str, Any]]:
 
 
 def _make_gpx_header(use_osmand_extensions: bool) -> str:
+    """Return the GPX header; adds OsmAnd namespace if enabled."""
     header = '<?xml version="1.0" encoding="UTF-8"?>\n'
     if use_osmand_extensions:
         header += (
@@ -198,7 +220,7 @@ def _make_gpx_header(use_osmand_extensions: bool) -> str:
 
 
 def _load_data(input_json_file: str, input_url: str) -> List[Dict[str, Any]]:
-    """Завантажує дані з файлу або URL та повертає список елементів."""
+    """Loads data from a file or URL and returns a list of items."""
     data_obj: Any
     if input_url:
         try:
@@ -217,6 +239,14 @@ def _load_data(input_json_file: str, input_url: str) -> List[Dict[str, Any]]:
 
 
 def _make_wpt(place: Dict[str, Any], cfg: Dict[str, Any], base_url: str) -> str:
+    """Build a GPX <wpt> element for a single place.
+
+    Uses fields: latitude, longitude (required), sealevel-><ele>, whenadded-><time>,
+    title-><name>, description-><desc>, kind-><type> (or a single group name from cfg),
+    viewurl to append a link (with base_url). When OsmAnd is enabled, adds icon/color/background
+    and a clickable link inside <extensions>.
+    Returns an empty string if lat/lon are missing.
+    """
     lat, lon = place.get("latitude"), place.get("longitude")
     if not lat or not lon:
         return ""
@@ -259,7 +289,7 @@ def _make_wpt(place: Dict[str, Any], cfg: Dict[str, Any], base_url: str) -> str:
 
 
 def convert_places_to_gpx(cfg: Dict[str, Any]) -> int:
-    """Конвертує дані з файлу або URL у GPX. Повертає кількість сконвертованих точок."""
+    """Converts data from a file or URL to GPX. Returns the number of converted points."""
     input_json_file = cfg.get("input_json") or ""
     input_url = cfg.get("input_url") or ""
     output_gpx_file = cfg["output_gpx"]
@@ -283,10 +313,13 @@ def convert_places_to_gpx(cfg: Dict[str, Any]) -> int:
 
 
 def main() -> int:
+    """Entry point: validates inputs, runs conversion, prints result.
+    Exit codes: 0 success, 1 handled error, 2 invalid input configuration.
+    """
     try:
         cfg = build_config_from_env_and_args()
 
-        # Перевірка джерела даних: файл або URL
+        # Validate data source: file or URL
         if bool(cfg.get("input_json")) and bool(cfg.get("input_url")):
             print("🚨 Помилка: виберіть лише одне джерело — файл (-i/--input) АБО URL (-u/--url).", file=sys.stderr)
             return 2
@@ -296,7 +329,7 @@ def main() -> int:
                 file=sys.stderr)
             return 2
 
-        # Інформаційне повідомлення про вибране джерело даних
+        # Informational message about the selected data source
         if cfg.get("input_url"):
             print(f"Джерело: URL -> {cfg['input_url']}")
         else:
@@ -307,7 +340,7 @@ def main() -> int:
         print(f"Конвертовано {count} точок.")
         return 0
     except FileNotFoundError as e:
-        # Уточнюємо який саме файл не знайдено
+        # Clarify which file was not found
         missing = getattr(e, 'filename', '') or 'вхідний файл'
         print(f"🚨 Помилка: файл '{missing}' не знайдено.", file=sys.stderr)
         return 1
