@@ -28,7 +28,7 @@
 
 `python convert.py -u "https://vpohid.com.ua/json/map/v/items/..."`
 
-## Імпортувати в OsmAnd
+## Імпорт в OsmAnd
 - OsmAnd → Мої місця → Імпортувати закладки.
 - Оберіть створений GPX-файл.
 
